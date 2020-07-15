@@ -1,0 +1,11 @@
+[Unit]
+Description=pitemp-exporter
+
+[Service]
+Restart=always
+RestartSec=1
+TimeoutStartSec=0
+ExecStart=/opt/pitemp-exporter/bin/pitemp-exporter
+
+[Install]
+WantedBy=multi-user.target

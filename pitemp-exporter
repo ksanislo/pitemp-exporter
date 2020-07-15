@@ -1,0 +1,48 @@
+#!/usr/bin/python3
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime
+import subprocess
+import re
+
+PORT = 9547
+
+class Server(BaseHTTPRequestHandler):
+    # Remove console logging
+    def log_message(self, format, *args):
+        None
+
+    def do_GET(self):
+        contents = self.build_contents(cpu_temp_file='/sys/class/thermal/thermal_zone0/temp', gpu_temp_command=['/usr/bin/vcgencmd', 'measure_temp'])
+        #contents = self.build_contents(cpu_temp_file='/sys/class/thermal/thermal_zone0/temp', gpu_temp_command=['echo', 'temp=42.8\'C'])
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(contents)
+        return
+
+    def build_contents(self, cpu_temp_file, gpu_temp_command):
+        retval = str()
+        properties = dict()
+        metrics = dict()
+
+        with open(cpu_temp_file) as f:
+            cpu_temp = float(int(f.readline())/1000)
+
+        retval+="# HELP pitemp_cpu_temp The current CPU temperature\n"
+        retval+="# TYPE pitemp_cpu_temp gauge\n"
+        retval+="pitemp_cpu_temp{} " + str(cpu_temp) + '\n'
+
+        gpu_temp_output = subprocess.check_output(gpu_temp_command).decode('utf-8')
+
+        m = re.search('=(.+?)\'', gpu_temp_output)
+        if m:
+            gpu_temp = m.group(1)
+
+        retval+="# HELP pitemp_gpu_temp The current GPU temperature\n"
+        retval+="# TYPE pitemp_gpu_temp gauge\n"
+        retval+="pitemp_gpu_temp{} " + str(gpu_temp) + '\n'
+        return retval.encode('utf-8')
+
+
+server = HTTPServer(('', PORT), Server)
+server.serve_forever()
